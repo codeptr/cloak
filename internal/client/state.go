@@ -33,13 +33,15 @@ type RawConfig struct {
 	RemotePort       string   // jsonOptional
 	AlternativeNames []string // jsonOptional
 	// defaults set in ProcessRawConfig
-	UDP           bool   // nullable
-	BrowserSig    string // nullable
-	Transport     string // nullable
-	CDNOriginHost string // nullable
-	CDNWsUrlPath  string // nullable
-	StreamTimeout int    // nullable
-	KeepAlive     int    // nullable
+	UDP                bool   // nullable
+	BrowserSig         string // nullable
+	Transport          string // nullable
+	CAPath             string // nullable
+	InsecureSkipVerify bool   // nullable
+	CDNOriginHost      string // nullable
+	CDNWsUrlPath       string // nullable
+	StreamTimeout      int    // nullable
+	KeepAlive          int    // nullable
 }
 
 type RemoteConnConfig struct {
@@ -57,14 +59,16 @@ type LocalConnConfig struct {
 }
 
 type AuthInfo struct {
-	UID              []byte
-	SessionId        uint32
-	ProxyMethod      string
-	EncryptionMethod byte
-	Unordered        bool
-	ServerPubKey     crypto.PublicKey
-	MockDomain       string
-	WorldState       common.WorldState
+	UID                []byte
+	SessionId          uint32
+	ProxyMethod        string
+	EncryptionMethod   byte
+	Unordered          bool
+	ServerPubKey       crypto.PublicKey
+	MockDomain         string
+	WorldState         common.WorldState
+	CAPath             string
+	InsecureSkipVerify bool
 }
 
 // semi-colon separated value. This is for Android plugin options
@@ -156,6 +160,13 @@ func (raw *RawConfig) ProcessRawConfig(worldState common.WorldState) (local Loca
 		return nullErr("ServerName")
 	}
 	auth.MockDomain = raw.ServerName
+	caPath, pathErr := common.GetAbsPath(raw.CAPath)
+	if !raw.InsecureSkipVerify && pathErr != nil && raw.CAPath != "" {
+		err = fmt.Errorf("CAPath: %v", pathErr)
+		return
+	}
+	auth.CAPath = caPath
+	auth.InsecureSkipVerify = raw.InsecureSkipVerify
 
 	var filteredAlternativeNames []string
 	for _, alternativeName := range raw.AlternativeNames {

@@ -1,12 +1,14 @@
 package client
 
 import (
+	"crypto/x509"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 
 	"github.com/cbeuw/Cloak/internal/common"
 	"github.com/gorilla/websocket"
@@ -19,9 +21,25 @@ type WSOverTLS struct {
 }
 
 func (ws *WSOverTLS) Handshake(rawConn net.Conn, authInfo AuthInfo) (sessionKey [32]byte, err error) {
+	var caCertPool *x509.CertPool
+	caCertPool = nil
+	if authInfo.CAPath != "" && !authInfo.InsecureSkipVerify {
+		// 1. 加载你的自定义 CA 证书
+		caCert, err := os.ReadFile(authInfo.CAPath)
+		if err != nil {
+			return sessionKey, fmt.Errorf("failed to read CA file: %v", err)
+		}
+
+		// 2. 创建证书池并添加 CA
+		caCertPool = x509.NewCertPool()
+		if !caCertPool.AppendCertsFromPEM(caCert) {
+			return sessionKey, errors.New("failed to parse CA certificate")
+		}
+	}
 	utlsConfig := &utls.Config{
 		ServerName:         authInfo.MockDomain,
-		InsecureSkipVerify: true,
+		InsecureSkipVerify: authInfo.InsecureSkipVerify,
+		RootCAs:            caCertPool,
 	}
 	uconn := utls.UClient(rawConn, utlsConfig, utls.HelloChrome_Auto)
 	err = uconn.BuildHandshakeState()
