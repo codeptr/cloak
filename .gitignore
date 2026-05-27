@@ -3,4 +3,6 @@ suppressions/
 crashers/
 *.zip
 .idea/
+.vscode
 build/
+release/
