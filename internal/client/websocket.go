@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"crypto/x509"
 	"encoding/base64"
 	"errors"
@@ -9,6 +10,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"sync"
+	"time"
 
 	"github.com/cbeuw/Cloak/internal/common"
 	"github.com/gorilla/websocket"
@@ -41,23 +44,6 @@ func (ws *WSOverTLS) Handshake(rawConn net.Conn, authInfo AuthInfo) (sessionKey 
 		InsecureSkipVerify: authInfo.InsecureSkipVerify,
 		RootCAs:            caCertPool,
 	}
-	uconn := utls.UClient(rawConn, utlsConfig, utls.HelloChrome_Auto)
-	err = uconn.BuildHandshakeState()
-	if err != nil {
-		return
-	}
-	for i, extension := range uconn.Extensions {
-		_, ok := extension.(*utls.ALPNExtension)
-		if ok {
-			uconn.Extensions = append(uconn.Extensions[:i], uconn.Extensions[i+1:]...)
-			break
-		}
-	}
-
-	err = uconn.Handshake()
-	if err != nil {
-		return
-	}
 
 	u, err := url.Parse(ws.wsUrl)
 	if err != nil {
@@ -67,7 +53,29 @@ func (ws *WSOverTLS) Handshake(rawConn net.Conn, authInfo AuthInfo) (sessionKey 
 	payload, sharedSecret := makeAuthenticationPayload(authInfo)
 	header := http.Header{}
 	header.Add("hidden", base64.StdEncoding.EncodeToString(append(payload.randPubKey[:], payload.ciphertextWithTag[:]...)))
-	c, _, err := websocket.NewClient(uconn, u, header, 16480, 16480)
+	var dialer = websocket.Dialer{
+		NetDialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			uconn := utls.UClient(rawConn, utlsConfig, utls.HelloChrome_Auto)
+			err = uconn.BuildHandshakeState()
+			if err != nil {
+				return nil, err
+			}
+			for i, extension := range uconn.Extensions {
+				_, ok := extension.(*utls.ALPNExtension)
+				if ok {
+					uconn.Extensions = append(uconn.Extensions[:i], uconn.Extensions[i+1:]...)
+					break
+				}
+			}
+			err = uconn.Handshake()
+			return uconn, err
+		},
+		HandshakeTimeout: 10 * time.Second,
+		ReadBufferSize:   32768,
+		WriteBufferSize:  32768,
+		WriteBufferPool:  &sync.Pool{},
+	}
+	c, _, err := dialer.Dial(u.String(), header)
 	if err != nil {
 		return sessionKey, fmt.Errorf("failed to handshake: %v", err)
 	}
