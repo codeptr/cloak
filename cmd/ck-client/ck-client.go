@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"runtime"
 
 	"github.com/cbeuw/Cloak/internal/common"
 
@@ -17,6 +18,8 @@ import (
 	mux "github.com/cbeuw/Cloak/internal/multiplex"
 	log "github.com/sirupsen/logrus"
 )
+
+const appName = "Cloak"
 
 var version string
 
@@ -155,6 +158,8 @@ func main() {
 	var seshMaker func() *mux.Session
 
 	d := &net.Dialer{Control: protector, KeepAlive: remoteConfig.KeepAlive}
+
+	log.Infof("%s %s (%s %s/%s)", appName, version, runtime.Version(), runtime.GOOS, runtime.GOARCH)
 
 	if adminUID != nil {
 		log.Infof("API base is %v", localConfig.LocalAddr)
