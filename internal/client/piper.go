@@ -115,7 +115,7 @@ func RouteTCP(listener net.Listener, streamTimeout time.Duration, singleplex boo
 			_ = localConn.SetReadDeadline(time.Now().Add(streamTimeout))
 			i, err := io.ReadAtLeast(localConn, data, 1)
 			if err != nil && err == io.EOF {
-				log.Info("Shadowsocks client disconnected")
+				//log.Info("Shadowsocks client disconnected")
 				localConn.Close()
 				return
 			} else if err != nil {
