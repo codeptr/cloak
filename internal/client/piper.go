@@ -114,7 +114,11 @@ func RouteTCP(listener net.Listener, streamTimeout time.Duration, singleplex boo
 			data := make([]byte, 10240)
 			_ = localConn.SetReadDeadline(time.Now().Add(streamTimeout))
 			i, err := io.ReadAtLeast(localConn, data, 1)
-			if err != nil {
+			if err != nil && err == io.EOF {
+				log.Info("Shadowsocks client disconnected")
+				localConn.Close()
+				return
+			} else if err != nil {
 				log.Errorf("Failed to read first packet from proxy client: %v", err)
 				localConn.Close()
 				return
