@@ -6,8 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cbeuw/Cloak/internal/common"
-
 	mux "github.com/cbeuw/Cloak/internal/multiplex"
 	log "github.com/sirupsen/logrus"
 )
@@ -107,6 +105,7 @@ func RouteTCP(listener net.Listener, streamTimeout time.Duration, singleplex boo
 			sesh = newSeshFunc()
 		}
 		go func(sesh *mux.Session, localConn net.Conn, timeout time.Duration) {
+			defer localConn.Close()
 			if singleplex {
 				sesh = newSeshFunc()
 			}
@@ -135,6 +134,7 @@ func RouteTCP(listener net.Listener, streamTimeout time.Duration, singleplex boo
 				}
 				return
 			}
+			defer stream.Close()
 
 			_, err = stream.Write(data[:i])
 			if err != nil {
@@ -144,14 +144,21 @@ func RouteTCP(listener net.Listener, streamTimeout time.Duration, singleplex boo
 				return
 			}
 
+			var wg sync.WaitGroup
+			wg.Add(2)
+
 			go func() {
-				if _, err := common.Copy(localConn, stream); err != nil {
+				if _, err := io.Copy(localConn, stream); err != nil {
 					log.Tracef("copying stream to proxy client: %v", err)
 				}
 			}()
-			if _, err = common.Copy(stream, localConn); err != nil {
-				log.Tracef("copying proxy client to stream: %v", err)
-			}
+			go func() {
+				if _, err = io.Copy(stream, localConn); err != nil {
+					log.Tracef("copying proxy client to stream: %v", err)
+				}
+			}()
+
+			wg.Wait()
 		}(sesh, localConn, streamTimeout)
 	}
 }

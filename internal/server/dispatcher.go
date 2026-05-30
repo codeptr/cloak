@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/cbeuw/Cloak/internal/common"
@@ -132,6 +133,7 @@ func dispatchConnection(conn net.Conn, sta *State) {
 	data := buf[:i]
 
 	goWeb := func() {
+		defer conn.Close()
 		redirPort := sta.RedirPort
 		if redirPort == "" {
 			_, redirPort, _ = net.SplitHostPort(conn.LocalAddr().String())
@@ -146,8 +148,15 @@ func dispatchConnection(conn net.Conn, sta *State) {
 			log.Error("Failed to send first packet to redirection server", err)
 			return
 		}
-		go common.Copy(webConn, conn)
-		go common.Copy(conn, webConn)
+		defer webConn.Close()
+
+		var wg sync.WaitGroup
+		wg.Add(2)
+
+		go io.Copy(webConn, conn)
+		go io.Copy(conn, webConn)
+
+		wg.Wait()
 	}
 
 	if err != nil {
@@ -287,6 +296,7 @@ func serveSession(sesh *mux.Session, ci ClientInfo, user *ActiveUser, sta *State
 				continue
 			}
 		}
+		defer newStream.Close()
 		proxyAddr := sta.ProxyBook[ci.ProxyMethod]
 		localConn, err := sta.ProxyDialer.Dial(proxyAddr.Network(), proxyAddr.String())
 		if err != nil {
@@ -294,18 +304,23 @@ func serveSession(sesh *mux.Session, ci ClientInfo, user *ActiveUser, sta *State
 			user.CloseSession(ci.SessionId, "Failed to connect to proxy server")
 			return err
 		}
+		defer localConn.Close()
 		log.Tracef("%v endpoint has been successfully connected", ci.ProxyMethod)
 
+		var wg sync.WaitGroup
+		wg.Add(2)
+
 		go func() {
-			if _, err := common.Copy(localConn, newStream); err != nil {
+			if _, err := io.Copy(localConn, newStream); err != nil {
 				log.Tracef("copying stream to proxy server: %v", err)
 			}
 		}()
-
 		go func() {
-			if _, err := common.Copy(newStream, localConn); err != nil {
+			if _, err := io.Copy(newStream, localConn); err != nil {
 				log.Tracef("copying proxy server to stream: %v", err)
 			}
 		}()
+
+		wg.Wait()
 	}
 }
