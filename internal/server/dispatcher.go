@@ -296,31 +296,33 @@ func serveSession(sesh *mux.Session, ci ClientInfo, user *ActiveUser, sta *State
 				continue
 			}
 		}
-		defer newStream.Close()
-		proxyAddr := sta.ProxyBook[ci.ProxyMethod]
-		localConn, err := sta.ProxyDialer.Dial(proxyAddr.Network(), proxyAddr.String())
-		if err != nil {
-			log.Errorf("Failed to connect to %v: %v", ci.ProxyMethod, err)
-			user.CloseSession(ci.SessionId, "Failed to connect to proxy server")
-			return err
-		}
-		defer localConn.Close()
-		log.Tracef("%v endpoint has been successfully connected", ci.ProxyMethod)
-
-		var wg sync.WaitGroup
-		wg.Add(2)
-
-		go func() {
-			if _, err := io.Copy(localConn, newStream); err != nil {
-				log.Tracef("copying stream to proxy server: %v", err)
+		go func(newStream net.Conn, ci ClientInfo, user *ActiveUser, sta *State) {
+			defer newStream.Close()
+			proxyAddr := sta.ProxyBook[ci.ProxyMethod]
+			localConn, err := sta.ProxyDialer.Dial(proxyAddr.Network(), proxyAddr.String())
+			if err != nil {
+				log.Errorf("Failed to connect to %v: %v", ci.ProxyMethod, err)
+				user.CloseSession(ci.SessionId, "Failed to connect to proxy server")
+				return
 			}
-		}()
-		go func() {
-			if _, err := io.Copy(newStream, localConn); err != nil {
-				log.Tracef("copying proxy server to stream: %v", err)
-			}
-		}()
+			defer localConn.Close()
+			log.Tracef("%v endpoint has been successfully connected", ci.ProxyMethod)
 
-		wg.Wait()
+			var wg sync.WaitGroup
+			wg.Add(2)
+
+			go func() {
+				if _, err := io.Copy(localConn, newStream); err != nil {
+					log.Tracef("copying stream to proxy server: %v", err)
+				}
+			}()
+			go func() {
+				if _, err := io.Copy(newStream, localConn); err != nil {
+					log.Tracef("copying proxy server to stream: %v", err)
+				}
+			}()
+
+			wg.Wait()
+		}(newStream, ci, user, sta)
 	}
 }
