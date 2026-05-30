@@ -1,18 +1,16 @@
 module github.com/cbeuw/Cloak
 
-go 1.24.0
-
-toolchain go1.24.2
+go 1.25
 
 require (
-	github.com/cbeuw/connutil v0.0.0-20200411215123-966bfaa51ee3
+	github.com/cbeuw/connutil v1.0.1
 	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/websocket v1.5.3
 	github.com/juju/ratelimit v1.0.2
 	github.com/refraction-networking/utls v1.8.2
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
-	go.etcd.io/bbolt v1.4.0
+	go.etcd.io/bbolt v1.4.3
 	golang.org/x/crypto v0.37.0
 )
 
