@@ -15,6 +15,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const appName = "Cloak"
+
 var version string
 
 func resolveBindAddr(bindAddrs []string) ([]net.Addr, error) {
@@ -178,6 +180,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("unable to initialise server state: %v", err)
 	}
+
+	log.Infof("%s %s (%s %s/%s)", appName, version, runtime.Version(), runtime.GOOS, runtime.GOARCH)
 
 	listen := func(bindAddr net.Addr) {
 		listener, err := net.Listen("tcp", bindAddr.String())
