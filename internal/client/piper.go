@@ -110,6 +110,8 @@ func RouteTCP(listener net.Listener, streamTimeout time.Duration, singleplex boo
 				sesh = newSeshFunc()
 			}
 
+			log.Infof("Accepted connection from tcp:%s ", localConn.RemoteAddr())
+
 			data := make([]byte, 10240)
 			_ = localConn.SetReadDeadline(time.Now().Add(streamTimeout))
 			i, err := io.ReadAtLeast(localConn, data, 1)
