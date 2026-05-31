@@ -105,7 +105,6 @@ func RouteTCP(listener net.Listener, streamTimeout time.Duration, singleplex boo
 			sesh = newSeshFunc()
 		}
 		go func(sesh *mux.Session, localConn net.Conn, timeout time.Duration) {
-			defer localConn.Close()
 			if singleplex {
 				sesh = newSeshFunc()
 			}
@@ -136,7 +135,6 @@ func RouteTCP(listener net.Listener, streamTimeout time.Duration, singleplex boo
 				}
 				return
 			}
-			defer stream.Close()
 
 			_, err = stream.Write(data[:i])
 			if err != nil {
@@ -146,21 +144,20 @@ func RouteTCP(listener net.Listener, streamTimeout time.Duration, singleplex boo
 				return
 			}
 
-			var wg sync.WaitGroup
-			wg.Add(2)
-
 			go func() {
+				defer stream.Close()
+				defer localConn.Close()
 				if _, err := io.Copy(localConn, stream); err != nil {
-					log.Tracef("copying stream to proxy client: %v", err)
+					log.Tracef("1copying stream to proxy client: %v", err)
 				}
 			}()
 			go func() {
-				if _, err = io.Copy(stream, localConn); err != nil {
+				defer localConn.Close()
+				defer stream.Close()
+				if _, err := io.Copy(stream, localConn); err != nil {
 					log.Tracef("copying proxy client to stream: %v", err)
 				}
 			}()
-
-			wg.Wait()
 		}(sesh, localConn, streamTimeout)
 	}
 }
