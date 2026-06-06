@@ -217,7 +217,7 @@ func (sesh *Session) closeStream(s *Stream, active bool) error {
 			return sesh.Close()
 		} else {
 			log.Debugf("session %v has no active stream left", sesh.id)
-			log.Debugf("session inactivity timeout is set to %v", sesh.InactivityTimeout.String())
+			log.Debugf("session inactivity timeout is %v", sesh.InactivityTimeout.String())
 			time.AfterFunc(sesh.InactivityTimeout, sesh.checkTimeout)
 		}
 	}

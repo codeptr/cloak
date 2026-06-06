@@ -112,7 +112,7 @@ func RouteTCP(listener net.Listener, streamTimeout time.Duration, singleplex boo
 			log.Infof("Accepted connection from tcp:%s ", localConn.RemoteAddr())
 
 			data := make([]byte, 10240)
-			_ = localConn.SetReadDeadline(time.Now().Add(streamTimeout))
+			_ = localConn.SetReadDeadline(time.Now().Add(5 * time.Second))
 			i, err := io.ReadAtLeast(localConn, data, 1)
 			if err != nil && err == io.EOF {
 				//log.Info("Shadowsocks client disconnected")
@@ -148,7 +148,7 @@ func RouteTCP(listener net.Listener, streamTimeout time.Duration, singleplex boo
 				defer stream.Close()
 				defer localConn.Close()
 				if _, err := io.Copy(localConn, stream); err != nil {
-					log.Tracef("1copying stream to proxy client: %v", err)
+					log.Tracef("copying stream to proxy client: %v", err)
 				}
 			}()
 			go func() {

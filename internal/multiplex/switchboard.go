@@ -2,12 +2,14 @@ package multiplex
 
 import (
 	"errors"
-	"github.com/cbeuw/Cloak/internal/common"
-	log "github.com/sirupsen/logrus"
 	"math/rand/v2"
 	"net"
 	"sync"
 	"sync/atomic"
+	"time"
+
+	"github.com/cbeuw/Cloak/internal/common"
+	log "github.com/sirupsen/logrus"
 )
 
 type switchboardStrategy int
@@ -73,12 +75,14 @@ func (sb *switchboard) send(data []byte, assignedConn *net.Conn) (n int, err err
 		if err != nil {
 			return 0, errBrokenSwitchboard
 		}
+		_ = conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 		n, err = conn.Write(data)
 		if err != nil {
 			sb.session.SetTerminalMsg("failed to send to remote " + err.Error())
 			sb.session.passiveClose()
 			return n, err
 		}
+		_ = conn.SetWriteDeadline(time.Time{})
 	case fixedConnMapping:
 		// FIXME: this strategy has a tendency to cause a TLS conn socket buffer to fill up,
 		// which is a problem when multiple streams are mapped to the same conn, resulting
@@ -93,12 +97,14 @@ func (sb *switchboard) send(data []byte, assignedConn *net.Conn) (n int, err err
 			}
 			*assignedConn = conn
 		}
+		_ = conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 		n, err = conn.Write(data)
 		if err != nil {
 			sb.session.SetTerminalMsg("failed to send to remote " + err.Error())
 			sb.session.passiveClose()
 			return n, err
 		}
+		_ = conn.SetWriteDeadline(time.Time{})
 	default:
 		return 0, errors.New("unsupported traffic distribution strategy")
 	}
